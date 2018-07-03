@@ -1,25 +1,30 @@
-const { app, BrowserWindow, Menu } = require('electron')
+const { app, BrowserWindow, Menu, ipcMain } = require('electron')
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
-let win
+let mainWindow
+let addWindow;
 
 function createWindow() {
 	// Create the browser window.
-	win = new BrowserWindow({ width: 800, height: 600 })
+	mainWindow = new BrowserWindow({ width: 800, height: 600 })
 
 	// and load the index.html of the app.
-	win.loadFile('index.html')
+	mainWindow.loadFile('index.html')
 
 	// Open the DevTools.
-	win.webContents.openDevTools()
+	// mainWindow.webContents.openDevTools()
 
 	// Emitted when the window is closed.
-	win.on('closed', () => {
+	mainWindow.on('closed', () => {
 		// Dereference the window object, usually you would store windows
 		// in an array if your app supports multi windows, this is the time
 		// when you should delete the corresponding element.
-		win = null
+		mainWindow = null;
+		if (addWindow) {
+			addWindow.close();
+		}
+
 	})
 
 	const mainMenu = Menu.buildFromTemplate(menuTemplate);
@@ -43,7 +48,7 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
 	// On macOS it's common to re-create a window in the app when the
 	// dock icon is clicked and there are no other windows open.
-	if (win === null) {
+	if (mainWindow === null) {
 		createWindow()
 	}
 })
@@ -51,50 +56,48 @@ app.on('activate', () => {
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
 
+function createAddWindow() {
+	addWindow = new BrowserWindow({
+		width: 300,
+		height: 200,
+		title: 'Add New Todo'
+	});
+	addWindow.loadFile('add.html');
+
+	addWindow.on('closed', () => {
+		addWindow = null;
+	});
+}
+
+ipcMain.on('todo:add', (event, arg) => {
+	mainWindow.webContents.send('todo:add', arg);
+
+	addWindow.close();
+});
 
 
 const menuTemplate = [
 	{
-		label: 'Edit',
-		submenu: [
-			{ role: 'undo' },
-			{ role: 'redo' },
-			{ type: 'separator' },
-			{ role: 'cut' },
-			{ role: 'copy' },
-			{ role: 'paste' },
-			{ role: 'pasteandmatchstyle' },
-			{ role: 'delete' },
-			{ role: 'selectall' }
-		]
-	},
-	{
-		label: 'View',
-		submenu: [
-			{ role: 'reload' },
-			{ role: 'forcereload' },
-			{ role: 'toggledevtools' },
-			{ type: 'separator' },
-			{ role: 'resetzoom' },
-			{ role: 'zoomin' },
-			{ role: 'zoomout' },
-			{ type: 'separator' },
-			{ role: 'togglefullscreen' }
-		]
-	},
-	{
-		role: 'window',
-		submenu: [
-			{ role: 'minimize' },
-			{ role: 'close' }
-		]
-	},
-	{
-		role: 'help',
+		label: 'File',
 		submenu: [
 			{
-				label: 'Learn More',
-				click() { require('electron').shell.openExternal('https://electronjs.org') }
+				label: 'New Todo',
+				click: () => {
+					createAddWindow();
+				}
+			},
+			{
+				label: 'Clear Todos',
+				click: () => {
+					mainWindow.webContents.send('todo:clear');
+				}
+			},
+			{
+				label: 'Quit',
+				accelerator: process.platform === 'darwin' ? 'Command+Q' : 'Control+Q',
+				click: () => {
+					app.quit();
+				}
 			}
 		]
 	}
@@ -102,38 +105,17 @@ const menuTemplate = [
 
 if (process.platform === 'darwin') {
 	menuTemplate.unshift({
-		label: app.getName(),
+
+	});
+}
+
+if (process.env.NODE_ENV !== 'production') {
+	menuTemplate.push({
+		label: 'View',
 		submenu: [
-			{ role: 'about' },
-			{ type: 'separator' },
-			{ role: 'services', submenu: [] },
-			{ type: 'separator' },
-			{ role: 'hide' },
-			{ role: 'hideothers' },
-			{ role: 'unhide' },
-			{ type: 'separator' },
-			{ role: 'quit' }
+			{ role: 'reload' },
+			{ role: 'toggleDevTools' }
 		]
+
 	})
-
-	// Edit menu
-	menuTemplate[1].submenu.push(
-		{ type: 'separator' },
-		{
-			label: 'Speech',
-			submenu: [
-				{ role: 'startspeaking' },
-				{ role: 'stopspeaking' }
-			]
-		}
-	)
-
-	// Window menu
-	menuTemplate[3].submenu = [
-		{ role: 'close' },
-		{ role: 'minimize' },
-		{ role: 'zoom' },
-		{ type: 'separator' },
-		{ role: 'front' }
-	]
 }
